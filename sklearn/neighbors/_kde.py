@@ -328,7 +328,7 @@ class KernelDensity(BaseEstimator):
         """
         check_is_fitted(self)
         # TODO: implement sampling for other valid kernel shapes
-        if self.kernel not in ["gaussian", "tophat"]:
+        if self.kernel not in ["gaussian", "tophat", "epanechnikov"]:
             raise NotImplementedError()
 
         data = np.asarray(self.tree_.data)
@@ -344,16 +344,25 @@ class KernelDensity(BaseEstimator):
         if self.kernel == "gaussian":
             return np.atleast_2d(rng.normal(data[i], self.bandwidth_))
 
-        elif self.kernel == "tophat":
-            # we first draw points from a d-dimensional normal distribution,
-            # then use an incomplete gamma function to map them to a uniform
-            # d-dimensional tophat distribution.
+        else : 
+            # draw points from a d-dimensional normal distribution
             dim = data.shape[1]
             X = rng.normal(size=(n_samples, dim))
             s_sq = row_norms(X, squared=True)
-            correction = (
-                gammainc(0.5 * dim, 0.5 * s_sq) ** (1.0 / dim)
-                * self.bandwidth_
-                / np.sqrt(s_sq)
-            )
+                
+            if self.kernel == "tophat":
+                # use an incomplete gamma function to map them to a uniform
+                # d-dimensional tophat distribution.
+                correction = (
+                    gammainc(0.5 * dim, 0.5 * s_sq) ** (1.0 / dim)
+                    * self.bandwidth_
+                    / np.sqrt(s_sq)
+                )
+
+            elif self.kernel == "epanechnikov":
+                # Use np.clip() to bound vamues
+                # Then compute the final correction factor by multiplying A with self.bandwidth_
+                A = np.clip(1 - (s_sq / np.max(s_sq)), 0, None) ** (1.0 / dim)
+                correction = A * self.bandwidth_ / np.sqrt(s_sq)
+
             return data[i] + X * correction[:, np.newaxis]
